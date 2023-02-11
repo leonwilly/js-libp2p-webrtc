@@ -11,17 +11,17 @@ export class DataChannelMuxerFactory implements StreamMuxerFactory {
    */
   private readonly peerConnection: RTCPeerConnection
 
-  /**
-   * The string representation of the protocol, required by `StreamMuxerFactory`
-   */
-  protocol: string = '/webrtc'
-
-  constructor (peerConnection: RTCPeerConnection) {
+  constructor (peerConnection: RTCPeerConnection, readonly protocol = '/webrtc') {
     this.peerConnection = peerConnection
+    // reject any datachannels as the muxer is not yet ready to process
+    // streams
+    this.peerConnection.ondatachannel = ({ channel }) => {
+      channel.close()
+    }
   }
 
   createStreamMuxer (init?: StreamMuxerInit | undefined): StreamMuxer {
-    return new DataChannelMuxer(this.peerConnection, init)
+    return new DataChannelMuxer(this.peerConnection, this.protocol, init)
   }
 }
 
@@ -33,10 +33,6 @@ export class DataChannelMuxer implements StreamMuxer {
    * WebRTC Peer Connection
    */
   private readonly peerConnection: RTCPeerConnection
-  /**
-   * The protocol as represented in the multiaddress
-   */
-  readonly protocol: string = '/webrtc'
 
   /**
    * Array of streams in the data channel
@@ -63,7 +59,7 @@ export class DataChannelMuxer implements StreamMuxer {
    */
   sink: Sink<Uint8Array, Promise<void>> = nopSink;
 
-  constructor (peerConnection: RTCPeerConnection, init?: StreamMuxerInit) {
+  constructor (peerConnection: RTCPeerConnection, readonly protocol = '/webrtc', init?: StreamMuxerInit) {
     /**
      * Initialized stream muxer
      */
